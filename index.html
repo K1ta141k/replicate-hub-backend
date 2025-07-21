@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-container">
+            <div class="login-box">
+                <h2><i class="fas fa-lock"></i> File Manager Access</h2>
+                <p>Enter your PIN to continue</p>
+                <div class="pin-input-container">
+                    <input type="password" id="pin-input" placeholder="Enter PIN" maxlength="10">
+                    <button id="login-btn">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </div>
+                <div class="login-error" id="login-error" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Invalid PIN. Please try again.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main File Manager Interface -->
+    <div class="container" id="main-container" style="display: none;">
+        <header class="header">
+            <h1><i class="fas fa-folder-open"></i> File Manager</h1>
+            <div class="header-controls">
+                <div class="upload-section">
+                    <label for="file-upload" class="upload-btn">
+                        <i class="fas fa-upload"></i> Upload Files
+                    </label>
+                    <input type="file" id="file-upload" multiple style="display: none;">
+                    <div class="upload-progress" id="upload-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span id="progress-text">0%</span>
+                    </div>
+                </div>
+                <button class="logout-btn" id="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </header>
+
+        <div class="breadcrumb" id="breadcrumb">
+            <span class="breadcrumb-item active" data-path="/">Home</span>
+        </div>
+
+        <div class="main-content split-layout">
+            <div class="sidebar">
+                <div class="folder-tree" id="folder-tree">
+                    <div class="folder-item root-folder" data-path="/">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <div class="toolbar">
+                    <div class="view-controls">
+                        <button class="view-btn active" data-view="grid">
+                            <i class="fas fa-th"></i>
+                        </button>
+                        <button class="view-btn" data-view="list">
+                            <i class="fas fa-list"></i>
+                        </button>
+                    </div>
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Search files...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+
+                <div class="files-container" id="files-container">
+                    <div class="loading" id="loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ide-pane" id="ide-pane">
+                <div class="ide-resizer" id="ide-resizer"></div>
+                <div class="ide-header">
+                    <h3>File Preview</h3>
+                    <button class="ide-close-btn" id="ide-close-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="ide-drop-area" id="ide-drop-area">Drop files here to open in IDE</div>
+                <div class="ide-tabs" id="ide-tabs"></div>
+                <div class="ide-content" id="ide-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="context-menu">
+        <div class="context-item" data-action="download">
+            <i class="fas fa-download"></i> Download
+        </div>
+        <div class="context-item" data-action="rename">
+            <i class="fas fa-edit"></i> Rename
+        </div>
+        <div class="context-item" data-action="delete">
+            <i class="fas fa-trash"></i> Delete
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="modal" id="rename-modal">
+        <div class="modal-content">
+            <h3>Rename File</h3>
+            <input type="text" id="rename-input" placeholder="Enter new name">
+            <div class="modal-buttons">
+                <button id="rename-cancel">Cancel</button>
+                <button id="rename-confirm">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
