@@ -50,8 +50,6 @@ http://<external-ip>:5000
 
 ## Example Screenshots
 
-![File Browser Example](example_1.png)
-
 ![File Editor Example](example_2.png)
 
 ---
