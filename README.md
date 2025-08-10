@@ -1,4 +1,4 @@
-# Shellles – Developer Workspace Backend
+# Replicate Hub – Developer Workspace Backend
 
 > Self-hosted service that lets you browse & edit project files, spin up an on-demand sandbox (Vite dev-server), and talk to an AI agent that can refactor code via function-calling.
 
@@ -75,4 +75,4 @@ scripts/           Helper CLI scripts (e.g. start_sandbox.py)
 ---
 
 ## License
-MIT © 2025 Shellles 
+MIT © 2025 Repicate Hub
