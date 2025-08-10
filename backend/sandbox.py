@@ -71,11 +71,18 @@ class SandboxManager:
             import sys, subprocess
             subprocess.run([sys.executable, "-m", "venv", "venv"], cwd=sandbox_dir, check=False)
 
-        host = "http://localhost:5173"
+        # Dev server networking metadata
+        port = int(os.getenv("SANDBOX_PORT", "5173"))
+        host_bind = os.getenv("SANDBOX_HOST", "0.0.0.0")  # 0.0.0.0 → listen on all interfaces
+        # URL shown to user; if binding to 0.0.0.0, they'll use server's IP
+        public_host = os.getenv("SANDBOX_PUBLIC_HOST", "localhost")
+        host = f"http://{public_host}:{port}"
         now = datetime.utcnow().isoformat()
         self.meta = {
             "sandboxId": sandbox_id,
             "url": host,
+            "host": host_bind,
+            "port": port,
             "startedAt": now,
             "timeoutMs": timeout_ms,
             "apiKey": api_key,
@@ -89,7 +96,19 @@ class SandboxManager:
             return self.meta  # already running
         sandbox_dir = self._sandbox_dir()
         subprocess.run(["npm", "install"], cwd=sandbox_dir, check=False)
-        self.process = subprocess.Popen(["npm", "run", "dev", "--", "--port", "5173"], cwd=sandbox_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        port = str(self.meta.get("port", 5173))
+        host_bind = str(self.meta.get("host", "0.0.0.0"))
+        # Bind Vite to external interfaces if SANDBOX_HOST=0.0.0.0; run detached so backend reloads don't kill it
+        env = os.environ.copy()
+        env.setdefault("BROWSER", "none")
+        self.process = subprocess.Popen(
+            ["npm", "run", "dev", "--", "--host", host_bind, "--port", port],
+            cwd=sandbox_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            env=env,
+        )
         return self.meta
 
     # keep old create for backward compatibility

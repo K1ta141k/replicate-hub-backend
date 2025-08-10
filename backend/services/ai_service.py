@@ -46,10 +46,36 @@ class AIService:
 
         # Decide mode
         user_text = " ".join([m.get("content", "") for m in messages if m.get("role") == "user"]) or ""
+        last_user = None
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                last_user = m.get("content", "")
+                break
+        is_frontend = bool(last_user and isinstance(last_user, str) and last_user.strip().lower().startswith("frontend:"))
         is_large = len(user_text) > 300 or any(k in user_text.lower() for k in [
             "build", "implement", "refactor", "scaffold", "migrate", "architecture", "fix bug", "add feature",
         ])
-        if is_large:
+        if is_frontend:
+            policy = (
+                "You are a frontend code generator.\n"
+                "When the user prompt starts with 'frontend:', interpret the rest as a UI description.\n"
+                "- Generate a Vite + React + TypeScript app structure using batched tool_calls.\n"
+                "- Create/overwrite these files at project root unless otherwise specified:\n"
+                "  index.html (loads /src/main.tsx)\n"
+                "  package.json (react, react-dom; devDependencies: vite, typescript, @types/react, @types/react-dom)\n"
+                "  tsconfig.json\n"
+                "  vite.config.ts\n"
+                "  src/main.tsx\n"
+                "  src/App.tsx\n"
+                "- You MUST use tool_calls to: make_dir('src') then write_file for each file.\n"
+                "- Do not attempt to run shell commands; the server will start the dev process itself.\n"
+                "- Do not wrap file content in markdown fences.\n"
+                "- Return a concise message explaining where the app runs.\n"
+                "Return your answer as JSON: {\n  \"tool_calls\": [ ... ],\n  \"message\": \"...\"\n}"
+            )
+            messages = [{"role": "system", "content": policy}] + messages
+            is_large = True
+        elif is_large:
             policy = (
                 "You are an autonomous coding assistant.\n"
                 "- Batch multiple tool calls in a single response using tool_calls to reduce round trips.\n"
@@ -76,6 +102,7 @@ class AIService:
 
         iterations = 0
         max_iterations = 8 if is_large else 4
+        started_dev = False
         while True:
             iterations += 1
             if iterations > max_iterations:
@@ -120,6 +147,13 @@ class AIService:
                         "tool_call_id": tc.get("id"),
                         "content": json.dumps(tool_result),
                     })
+                # Auto-start dev server for frontend mode (once)
+                if is_frontend and not started_dev:
+                    try:
+                        sandbox_manager.start_dev()
+                        started_dev = True
+                    except Exception:
+                        pass
                 # Follow-up without tools to avoid provider complaints
                 resp = call_llm(provider, model_id, messages, None)
                 try:
@@ -171,6 +205,13 @@ class AIService:
                                 params = self._coerce_args(fn_name, raw_args)
                         tool_result = self._execute_tool(fn_name, params)
                         messages.append({"role": "function", "name": fn_name, "content": json.dumps(tool_result)})
+                    # Auto-start dev server for frontend mode (once)
+                    if is_frontend and not started_dev:
+                        try:
+                            sandbox_manager.start_dev()
+                            started_dev = True
+                        except Exception:
+                            pass
                     resp = call_llm(provider, model_id, messages, None)
                     try:
                         logger.info("LLM response (JSON tool_calls loop):\n%s", json.dumps(resp, indent=2)[:2000])
@@ -189,6 +230,18 @@ class AIService:
                 assistant_msg = str(obj.get("message"))
         except Exception:
             pass
+        if is_frontend:
+            url = sandbox_manager.meta.get("url") or "http://localhost:5173"
+            if not assistant_msg:
+                assistant_msg = f"App is running at {url}."
+            else:
+                try:
+                    # Replace any localhost:PORT with the actual sandbox URL and avoid 3000/8000 in output
+                    assistant_msg = re.sub(r"https?://localhost:\d+", url, assistant_msg)
+                    if "http" not in assistant_msg:
+                        assistant_msg = assistant_msg.rstrip() + f" App is running at {url}."
+                except Exception:
+                    pass
         return {"assistant": assistant_msg, "messages": messages}
 
     @staticmethod
