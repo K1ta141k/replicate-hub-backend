@@ -1,0 +1,22 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+env/
+
+# ---- Node / JS ----
+node_modules/
+*.log
+
+# ---- Sandbox runtime ----
+sandbox_workspace/
+
+# ---- Editors & OS ----
+.DS_Store
+.idea/
+.vscode/
+
+# ---- Secrets ----
+.env

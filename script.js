@@ -5,12 +5,645 @@ class FileManager {
         this.folders = [];
         this.currentView = 'grid';
         this.selectedFile = null;
-        this.apiBase = '/api'; // Use relative path for same-host deployment
-        this.authenticated = false;
-        
+        this.apiBase = 'http://localhost:8000/api';
+
+        // Step 1: grab standard elements
         this.initializeElements();
+        // Step 2: dashboard specific elements
+        this.elements.projectDashboard = document.getElementById('project-dashboard');
+        this.elements.projectsContainer = document.getElementById('projects-container');
+        this.elements.newProjectName = document.getElementById('new-project-name');
+        this.elements.createProjectBtn = document.getElementById('create-project-btn');
+        this.elements.newFileBtn = document.getElementById('new-file-btn');
+        this.elements.newFileModal = document.getElementById('new-file-modal');
+        this.elements.newFileInput = document.getElementById('new-file-input');
+        this.elements.newFileCancel = document.getElementById('new-file-cancel');
+        this.elements.newFileConfirm = document.getElementById('new-file-confirm');
+        this.elements.runSandboxBtn = document.getElementById('run-sandbox-btn');
+        this.elements.chatPane = document.getElementById('chat-pane');
+        this.elements.chatToggle = document.getElementById('chat-toggle-btn');
+        this.elements.chatClose = document.getElementById('chat-close');
+        this.elements.chatMessages = document.getElementById('chat-messages');
+        this.elements.chatText = document.getElementById('chat-text');
+        this.elements.chatSend = document.getElementById('chat-send');
+        this.elements.modelSelect = document.getElementById('model-select');
+        this.chatHistory = [];
+
+        // Bind events (needs elements ready)
         this.bindEvents();
-        this.checkAuthentication();
+
+        // Skip authentication completely
+        this.authenticated = true;
+
+        // Show dashboard immediately
+        this.showProjectDashboard();
+        
+        // Initialize Monaco Editor
+        this.initMonacoEditor();
+    }
+
+    initMonacoEditor() {
+        // Initialize Monaco Editor when the page loads
+        if (typeof require !== 'undefined') {
+            require.config({ 
+                paths: { 
+                    'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' 
+                } 
+            });
+            require(['vs/editor/editor.main'], () => {
+                this.monaco = window.monaco;
+                console.log('Monaco Editor loaded successfully');
+                
+                // Configure Monaco editor options
+                this.monaco.editor.defineTheme('custom-dark', {
+                    base: 'vs-dark',
+                    inherit: true,
+                    rules: [],
+                    colors: {
+                        'editor.background': '#1e1e1e',
+                        'editor.foreground': '#cccccc',
+                        'editor.lineHighlightBackground': '#2d2d30',
+                        'editor.selectionBackground': '#264f78',
+                        'editor.inactiveSelectionBackground': '#3a3d41'
+                    }
+                });
+                
+                this.monaco.editor.setTheme('custom-dark');
+            });
+        } else {
+            // Fallback if Monaco fails to load
+            console.warn('Monaco Editor failed to load, using fallback textarea');
+        }
+    }
+
+    createMonacoEditor(filePath, content, fileName) {
+        // Destroy existing editor if any
+        if (this.currentEditor) {
+            this.currentEditor.destroy();
+            this.currentEditor = null;
+        }
+
+        // Ensure Monaco is loaded
+        if (!this.monaco) {
+            console.error('Monaco Editor not loaded');
+            return;
+        }
+
+        // Get the container element
+        const container = document.getElementById('monaco-container');
+        if (!container) {
+            console.error('Monaco container not found');
+            return;
+        }
+
+        // Clear any existing content
+        container.innerHTML = '';
+
+        try {
+            // Create new Monaco Editor instance with enhanced features
+            this.currentEditor = this.monaco.editor.create(container, {
+                value: content || '',
+                language: this.getMonacoLanguage(fileName),
+                theme: 'custom-dark',
+                automaticLayout: true,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                fontSize: 14,
+                lineNumbers: 'on',
+                roundedSelection: false,
+                scrollbar: {
+                    vertical: 'visible',
+                    horizontal: 'visible'
+                },
+                wordWrap: 'on',
+                folding: true,
+                lineDecorationsWidth: 10,
+                lineNumbersMinChars: 3,
+                renderLineHighlight: 'all',
+                selectOnLineNumbers: true,
+                glyphMargin: true,
+                useTabStops: false,
+                fontSize: 14,
+                tabSize: 4,
+                insertSpaces: true,
+                detectIndentation: true,
+                trimAutoWhitespace: true,
+                largeFileOptimizations: true,
+                maxTokenizationLineLength: 20000,
+                // Enhanced features
+                suggestOnTriggerCharacters: true,
+                quickSuggestions: true,
+                parameterHints: {
+                    enabled: true
+                },
+                hover: {
+                    enabled: true
+                },
+                contextmenu: true,
+                mouseWheelZoom: true,
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
+                // Code folding
+                foldingStrategy: 'indentation',
+                showFoldingControls: 'always',
+                // Auto-completion
+                suggest: {
+                    insertMode: 'replace',
+                    showKeywords: true,
+                    showSnippets: true,
+                    showClasses: true,
+                    showFunctions: true,
+                    showVariables: true,
+                    showConstants: true,
+                    showEnums: true,
+                    showInterfaces: true,
+                    showModules: true,
+                    showProperties: true,
+                    showEvents: true,
+                    showOperators: true,
+                    showUnits: true,
+                    showValues: true,
+                    showColors: true,
+                    showFiles: true,
+                    showReferences: true,
+                    showFolders: true,
+                    showTypeParameters: true,
+                    showWords: true,
+                    showColors: true,
+                    showUserWords: true
+                }
+            });
+
+            // Configure language-specific settings
+            this.configureLanguageSettings(fileName);
+
+            // Add save button event
+            const saveBtn = document.getElementById('ide-save-btn');
+            if (saveBtn) {
+                // Remove existing event listeners
+                const newSaveBtn = saveBtn.cloneNode(true);
+                saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+                
+                newSaveBtn.addEventListener('click', async () => {
+                    await this.saveFileContent(filePath, this.currentEditor.getValue());
+                });
+            }
+
+            // Add keyboard shortcut for save (Ctrl+S)
+            this.currentEditor.addCommand(this.monaco.KeyMod.CtrlCmd | this.monaco.KeyCode.KeyS, async () => {
+                await this.saveFileContent(filePath, this.currentEditor.getValue());
+            });
+
+            // Add keyboard shortcut for find (Ctrl+F)
+            this.currentEditor.addCommand(this.monaco.KeyMod.CtrlCmd | this.monaco.KeyCode.KeyF, () => {
+                this.currentEditor.trigger('keyboard', 'actions.find', {});
+            });
+
+            // Add keyboard shortcut for replace (Ctrl+H)
+            this.currentEditor.addCommand(this.monaco.KeyMod.CtrlCmd | this.monaco.KeyCode.KeyH, () => {
+                this.currentEditor.trigger('keyboard', 'editor.action.startFindReplaceAction', {});
+            });
+
+            // Add keyboard shortcut for go to line (Ctrl+G)
+            this.currentEditor.addCommand(this.monaco.KeyMod.CtrlCmd | this.monaco.KeyCode.KeyG, () => {
+                this.currentEditor.trigger('keyboard', 'editor.action.gotoLine', {});
+            });
+
+            // Track content changes
+            this.currentEditor.onDidChangeModelContent(() => {
+                this.markFileAsModified(filePath);
+            });
+
+            // Focus the editor
+            this.currentEditor.focus();
+
+            console.log(`Monaco Editor created for ${fileName} with language: ${this.getMonacoLanguage(fileName)}`);
+        } catch (error) {
+            console.error('Error creating Monaco Editor:', error);
+            // Fallback to textarea
+            this.createFallbackEditor(container, content, fileName);
+        }
+    }
+
+    configureLanguageSettings(fileName) {
+        if (!this.currentEditor || !this.monaco) return;
+
+        const language = this.getMonacoLanguage(fileName);
+        
+        // Configure language-specific settings
+        switch (language) {
+            case 'python':
+                this.monaco.languages.setLanguageConfiguration('python', {
+                    comments: {
+                        lineComment: '#',
+                        blockComment: ['"""', '"""']
+                    },
+                    brackets: [
+                        ['{', '}'],
+                        ['[', ']'],
+                        ['(', ')']
+                    ],
+                    autoClosingPairs: [
+                        { open: '{', close: '}' },
+                        { open: '[', close: ']' },
+                        { open: '(', close: ')' },
+                        { open: '"', close: '"' },
+                        { open: "'", close: "'" }
+                    ],
+                    surroundingPairs: [
+                        { open: '{', close: '}' },
+                        { open: '[', close: ']' },
+                        { open: '(', close: ')' },
+                        { open: '"', close: '"' },
+                        { open: "'", close: "'" }
+                    ]
+                });
+                break;
+                
+            case 'javascript':
+            case 'typescript':
+                this.monaco.languages.setLanguageConfiguration('javascript', {
+                    comments: {
+                        lineComment: '//',
+                        blockComment: ['/*', '*/']
+                    },
+                    brackets: [
+                        ['{', '}'],
+                        ['[', ']'],
+                        ['(', ')']
+                    ],
+                    autoClosingPairs: [
+                        { open: '{', close: '}' },
+                        { open: '[', close: ']' },
+                        { open: '(', close: ')' },
+                        { open: '"', close: '"' },
+                        { open: "'", close: "'" },
+                        { open: '`', close: '`' }
+                    ],
+                    surroundingPairs: [
+                        { open: '{', close: '}' },
+                        { open: '[', close: ']' },
+                        { open: '(', close: ')' },
+                        { open: '"', close: '"' },
+                        { open: "'", close: "'" },
+                        { open: '`', close: '`' }
+                    ]
+                });
+                break;
+                
+            case 'html':
+                this.monaco.languages.setLanguageConfiguration('html', {
+                    comments: {
+                        blockComment: ['<!--', '-->']
+                    },
+                    brackets: [
+                        ['{', '}'],
+                        ['[', ']'],
+                        ['(', ')'],
+                        ['<', '>']
+                    ],
+                    autoClosingPairs: [
+                        { open: '{', close: '}' },
+                        { open: '[', close: ']' },
+                        { open: '(', close: ')' },
+                        { open: '"', close: '"' },
+                        { open: "'", close: "'" },
+                        { open: '<', close: '>' }
+                    ],
+                    surroundingPairs: [
+                        { open: '{', close: '}' },
+                        { open: '[', close: ']' },
+                        { open: '(', close: ')' },
+                        { open: '"', close: '"' },
+                        { open: "'", close: "'" },
+                        { open: '<', close: '>' }
+                    ]
+                });
+                break;
+        }
+    }
+
+    createFallbackEditor(container, content, fileName) {
+        container.innerHTML = `
+            <textarea id="ide-textarea" spellcheck="false" 
+                      style="width: 100%; height: calc(100vh - 200px); border: none; outline: none; padding: 10px; 
+                             font-family: 'Fira Code', 'Consolas', 'Monaco', monospace; font-size: 14px; 
+                             resize: none; background: #1e1e1e; color: #cccccc; line-height: 1.5;">${this.escapeHtml(content || '')}</textarea>
+        `;
+        
+        const textarea = document.getElementById('ide-textarea');
+        if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(0, 0);
+        }
+    }
+
+    getMonacoLanguage(fileName) {
+        const ext = fileName.split('.').pop().toLowerCase();
+        const languageMap = {
+            // JavaScript/TypeScript
+            'js': 'javascript',
+            'jsx': 'javascript',
+            'mjs': 'javascript',
+            'ts': 'typescript',
+            'tsx': 'typescript',
+            
+            // Python
+            'py': 'python',
+            'pyw': 'python',
+            'pyi': 'python',
+            'pyx': 'python',
+            'pxd': 'python',
+            
+            // Web Technologies
+            'html': 'html',
+            'htm': 'html',
+            'xhtml': 'html',
+            'css': 'css',
+            'scss': 'scss',
+            'sass': 'scss',
+            'less': 'less',
+            'styl': 'stylus',
+            
+            // Data Formats
+            'json': 'json',
+            'jsonc': 'jsonc',
+            'json5': 'json',
+            'xml': 'xml',
+            'svg': 'xml',
+            'yaml': 'yaml',
+            'yml': 'yaml',
+            'toml': 'toml',
+            'ini': 'ini',
+            'conf': 'ini',
+            'cfg': 'ini',
+            
+            // Markup
+            'md': 'markdown',
+            'markdown': 'markdown',
+            'rst': 'markdown',
+            
+            // SQL
+            'sql': 'sql',
+            'mysql': 'sql',
+            'pgsql': 'sql',
+            'sqlite': 'sql',
+            
+            // PHP
+            'php': 'php',
+            'phtml': 'php',
+            'php3': 'php',
+            'php4': 'php',
+            'php5': 'php',
+            'php7': 'php',
+            
+            // Java
+            'java': 'java',
+            'class': 'java',
+            'jar': 'java',
+            
+            // C/C++
+            'cpp': 'cpp',
+            'cc': 'cpp',
+            'cxx': 'cpp',
+            'c++': 'cpp',
+            'c': 'c',
+            'h': 'cpp',
+            'hpp': 'cpp',
+            'hxx': 'cpp',
+            
+            // C#
+            'cs': 'csharp',
+            'csx': 'csharp',
+            
+            // Go
+            'go': 'go',
+            'mod': 'go',
+            'sum': 'go',
+            
+            // Rust
+            'rs': 'rust',
+            'rlib': 'rust',
+            
+            // Ruby
+            'rb': 'ruby',
+            'erb': 'ruby',
+            'rake': 'ruby',
+            'gemspec': 'ruby',
+            
+            // Shell Scripts
+            'sh': 'shell',
+            'bash': 'shell',
+            'zsh': 'shell',
+            'fish': 'shell',
+            'ksh': 'shell',
+            'csh': 'shell',
+            'tcsh': 'shell',
+            'ps1': 'powershell',
+            'psm1': 'powershell',
+            'psd1': 'powershell',
+            
+            // Configuration
+            'env': 'properties',
+            'properties': 'properties',
+            'config': 'properties',
+            
+            // Documentation
+            'txt': 'plaintext',
+            'log': 'plaintext',
+            'readme': 'plaintext',
+            'license': 'plaintext',
+            
+            // Docker
+            'dockerfile': 'dockerfile',
+            'docker': 'dockerfile',
+            
+            // Git
+            'gitignore': 'gitignore',
+            'gitattributes': 'gitattributes',
+            'gitmodules': 'gitmodules',
+            
+            // Make
+            'makefile': 'makefile',
+            'mk': 'makefile',
+            
+            // CMake
+            'cmake': 'cmake',
+            'cmake.in': 'cmake',
+            
+            // Lua
+            'lua': 'lua',
+            
+            // Perl
+            'pl': 'perl',
+            'pm': 'perl',
+            't': 'perl',
+            
+            // R
+            'r': 'r',
+            'rdata': 'r',
+            'rds': 'r',
+            
+            // Scala
+            'scala': 'scala',
+            'sc': 'scala',
+            
+            // Kotlin
+            'kt': 'kotlin',
+            'kts': 'kotlin',
+            
+            // Swift
+            'swift': 'swift',
+            
+            // Objective-C
+            'm': 'objective-c',
+            'mm': 'objective-c',
+            'h': 'objective-c'
+        };
+        
+        const language = languageMap[ext];
+        if (language) {
+            console.log(`Detected language: ${language} for file: ${fileName}`);
+            return language;
+        }
+        
+        // Fallback for unknown extensions
+        console.log(`No language mapping found for extension: ${ext}, using plaintext`);
+        return 'plaintext';
+    }
+
+    async saveFileContent(filePath, content) {
+        try {
+            // Show saving indicator
+            const saveBtn = document.getElementById('ide-save-btn');
+            if (saveBtn) {
+                const originalText = saveBtn.textContent;
+                saveBtn.textContent = 'Saving...';
+                saveBtn.disabled = true;
+                
+                // Restore button after save attempt
+                setTimeout(() => {
+                    saveBtn.textContent = originalText;
+                    saveBtn.disabled = false;
+                }, 2000);
+            }
+
+            const response = await fetch(`${this.apiBase}/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ 
+                    path: filePath, 
+                    content: content,
+                    timestamp: new Date().toISOString()
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.showSuccess(`File saved successfully! ${result.message || ''}`);
+                
+                // Update the file in the current list if it exists
+                this.updateFileInList(filePath, content);
+                
+                // Add a visual indicator that the file was saved
+                this.markFileAsSaved(filePath);
+                
+                return true;
+            } else {
+                const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Save failed:', error);
+            const errorMessage = error.message || 'Failed to save file';
+            this.showError(`Save failed: ${errorMessage}`);
+            
+            // Show retry option
+            this.showRetrySaveDialog(filePath, content);
+            
+            return false;
+        }
+    }
+
+    updateFileInList(filePath, content) {
+        // Find the file in the current files list and update its size
+        const fileName = filePath.split('/').pop();
+        const fileIndex = this.files.findIndex(f => f.name === fileName);
+        if (fileIndex !== -1) {
+            // Update the file size (rough estimation)
+            const sizeInBytes = new Blob([content]).size;
+            this.files[fileIndex].size = this.formatFileSize(sizeInBytes);
+            
+            // Re-render files to show updated size
+            this.renderFiles();
+        }
+    }
+
+    markFileAsSaved(filePath) {
+        // Remove modified indicator and add saved indicator
+        const tab = document.querySelector(`.ide-tab[data-path="${filePath}"]`);
+        if (tab) {
+            tab.classList.remove('modified');
+            tab.classList.add('recently-saved');
+            tab.removeAttribute('title');
+            
+            setTimeout(() => {
+                tab.classList.remove('recently-saved');
+            }, 3000);
+        }
+    }
+
+    markFileAsModified(filePath) {
+        // Add visual indicator that file has unsaved changes
+        const tab = document.querySelector(`.ide-tab[data-path="${filePath}"]`);
+        if (tab && !tab.classList.contains('modified')) {
+            tab.classList.add('modified');
+            tab.setAttribute('title', 'File has unsaved changes');
+        }
+    }
+
+    showRetrySaveDialog(filePath, content) {
+        const retryDialog = document.createElement('div');
+        retryDialog.className = 'retry-save-dialog';
+        retryDialog.innerHTML = `
+            <div class="retry-save-content">
+                <h4>Save Failed</h4>
+                <p>The file could not be saved. Would you like to retry?</p>
+                <div class="retry-buttons">
+                    <button class="retry-btn">Retry Save</button>
+                    <button class="cancel-retry-btn">Cancel</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(retryDialog);
+        
+        // Add event listeners
+        retryDialog.querySelector('.retry-btn').addEventListener('click', async () => {
+            retryDialog.remove();
+            await this.saveFileContent(filePath, content);
+        });
+        
+        retryDialog.querySelector('.cancel-retry-btn').addEventListener('click', () => {
+            retryDialog.remove();
+        });
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (retryDialog.parentNode) {
+                retryDialog.remove();
+            }
+        }, 10000);
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
     initializeElements() {
@@ -72,6 +705,17 @@ class FileManager {
         this.elements.renameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.confirmRename();
         });
+
+        // New file modal
+        if (this.elements.newFileBtn) {
+            this.elements.newFileBtn.addEventListener('click', () => this.showNewFileModal());
+        }
+        if (this.elements.newFileCancel) {
+            this.elements.newFileCancel.addEventListener('click', () => this.hideNewFileModal());
+        }
+        if (this.elements.newFileConfirm) {
+            this.elements.newFileConfirm.addEventListener('click', () => this.createNewFile());
+        }
         
         // Prevent context menu on right click
         document.getElementById('main-container').addEventListener('contextmenu', (e) => e.preventDefault());
@@ -111,6 +755,45 @@ class FileManager {
                 console.error('Error parsing dropped file data:', error);
             }
         });
+
+        // Project creation
+        if (this.elements.createProjectBtn) {
+            this.elements.createProjectBtn.addEventListener('click', () => this.createProject());
+        }
+
+        // Selecting a project (event delegation)
+        if (this.elements.projectsContainer) {
+            this.elements.projectsContainer.addEventListener('click', (e) => {
+                const card = e.target.closest('.project-card');
+                if (card) {
+                    this.openProject(card.dataset.name);
+                }
+            });
+        }
+
+        // Run sandbox
+        if (this.elements.runSandboxBtn) {
+            this.elements.runSandboxBtn.addEventListener('click', () => this.runSandbox());
+        }
+
+        // Chat events
+        if (this.elements.chatToggle) {
+            this.elements.chatToggle.addEventListener('click', () => this.elements.chatPane.style.display = 'block');
+        }
+        if (this.elements.chatClose) {
+            this.elements.chatClose.addEventListener('click', () => this.elements.chatPane.style.display = 'none');
+        }
+        if (this.elements.chatSend) {
+            this.elements.chatSend.addEventListener('click', () => this.sendChat());
+        }
+        if (this.elements.chatText) {
+            this.elements.chatText.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChat();
+                }
+            });
+        }
     }
 
     async checkAuthentication() {
@@ -528,6 +1211,40 @@ class FileManager {
         this.elements.renameModal.style.display = 'none';
     }
 
+    // ---------- New File Modal ---------- //
+    showNewFileModal() {
+        this.elements.newFileInput.value = '';
+        this.elements.newFileModal.style.display = 'flex';
+        this.elements.newFileInput.focus();
+    }
+
+    hideNewFileModal() {
+        this.elements.newFileModal.style.display = 'none';
+    }
+
+    async createNewFile() {
+        const fileName = this.elements.newFileInput.value.trim();
+        if (!fileName) return;
+        try {
+            const relPath = (this.currentPath === '/' ? '' : this.currentPath) + '/' + fileName;
+            const resp = await fetch(`${this.apiBase}/create-file`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ path: relPath, content: '' })
+            });
+            if (!resp.ok) {
+                const d = await resp.json().catch(() => ({}));
+                alert(d.detail || 'Failed to create file');
+                return;
+            }
+            this.hideNewFileModal();
+            this.loadCurrentDirectory();
+        } catch (err) {
+            console.error('Create file error:', err);
+        }
+    }
+
     async confirmRename() {
         if (!this.selectedFile) return;
         const newName = this.elements.renameInput.value.trim();
@@ -592,6 +1309,12 @@ class FileManager {
         alert(message);
     }
 
+    showSuccess(message) {
+        // Simple success feedback; replace with nicer toast if desired
+        console.log(message);
+        alert(message);
+    }
+
     // Tabbed preview modal logic
     openTabs = [];
     openFileTab(item) {
@@ -621,6 +1344,12 @@ class FileManager {
     }
 
     closeTab(filePath) {
+        // Check if file has unsaved changes
+        if (this.hasUnsavedChanges(filePath)) {
+            this.showUnsavedChangesDialog(filePath);
+            return;
+        }
+        
         this.openTabs = this.openTabs.filter(tab => tab.path !== filePath);
         if (this.activeTab === filePath && this.openTabs.length > 0) {
             this.activeTab = this.openTabs[this.openTabs.length - 1].path;
@@ -628,8 +1357,56 @@ class FileManager {
             this.closeIdePane();
             return;
         }
+        
+        // Clean up Monaco Editor if closing the active tab
+        if (this.activeTab === filePath && this.currentEditor) {
+            this.currentEditor.destroy();
+            this.currentEditor = null;
+        }
+        
         this.renderIdeTabs();
         this.renderIdeContent();
+    }
+
+    hasUnsavedChanges(filePath) {
+        const tab = document.querySelector(`.ide-tab[data-path="${filePath}"]`);
+        return tab && tab.classList.contains('modified');
+    }
+
+    showUnsavedChangesDialog(filePath) {
+        const dialog = document.createElement('div');
+        dialog.className = 'unsaved-changes-dialog';
+        dialog.innerHTML = `
+            <div class="unsaved-changes-content">
+                <h4>Unsaved Changes</h4>
+                <p>The file "${filePath.split('/').pop()}" has unsaved changes. What would you like to do?</p>
+                <div class="unsaved-buttons">
+                    <button class="save-close-btn">Save & Close</button>
+                    <button class="close-without-save-btn">Close Without Saving</button>
+                    <button class="cancel-close-btn">Cancel</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(dialog);
+        
+        // Add event listeners
+        dialog.querySelector('.save-close-btn').addEventListener('click', async () => {
+            if (this.currentEditor && this.activeTab === filePath) {
+                await this.saveFileContent(filePath, this.currentEditor.getValue());
+            }
+            dialog.remove();
+            this.closeTab(filePath);
+        });
+        
+        dialog.querySelector('.close-without-save-btn').addEventListener('click', () => {
+            dialog.remove();
+            this.closeTab(filePath);
+        });
+        
+        dialog.querySelector('.cancel-close-btn').addEventListener('click', () => {
+            dialog.remove();
+        });
     }
 
     renderIdeTabs() {
@@ -723,111 +1500,201 @@ class FileManager {
                 const resp = await fetch(`${this.apiBase}/read?path=${encodeURIComponent(filePath)}`, {
                     credentials: 'include'
                 });
-                if (resp.ok) {
-                    const data = await resp.json();
-                    this.elements.ideContent.innerHTML = `
-                        <textarea id="ide-textarea" spellcheck="false" style="width: 100%; height: calc(100vh - 200px); border: none; outline: none; padding: 10px; font-family: monospace; resize: none;">${this.escapeHtml(data.content)}</textarea>
-                        <div style="padding: 10px; border-top: 1px solid #dee2e6;">
-                            <button id="ide-save-btn" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Save</button>
-                        </div>`;
-                    
-                    // Add save button event
-                    document.getElementById('ide-save-btn').addEventListener('click', async () => {
-                        const newContent = document.getElementById('ide-textarea').value;
-                        try {
-                            const resp = await fetch(`${this.apiBase}/save`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({ path: filePath, content: newContent })
-                            });
-                            if (resp.ok) {
-                                this.showSuccess('File saved successfully!');
-                            } else {
-                                this.showError('Failed to save file.');
-                            }
-                        } catch (err) {
-                            this.showError('Failed to save file.');
-                        }
-                    });
-                } else {
-                    this.elements.ideContent.innerHTML = `
-                        <div style="padding: 20px; color: #dc3545;">
-                            Cannot preview this file.
-                        </div>`;
-                }
-            } catch (err) {
-                this.elements.ideContent.innerHTML = `
-                    <div style="padding: 20px; color: #dc3545;">
-                        Failed to preview file.
-                    </div>`;
+                if (!resp.ok) throw new Error('Failed to load file content');
+                const data = await resp.json();
+                const content = data.content ?? '';
+
+                // Insert a container for Monaco Editor
+                this.elements.ideContent.innerHTML = '<div id="monaco-container" style="width:100%;height:100%;"></div>';
+                this.createMonacoEditor(filePath, content, fileName);
+            } catch (error) {
+                console.error('Failed to load file:', error);
+                this.elements.ideContent.innerHTML = '<div style="padding:20px;color:#dc3545;">Failed to load file.</div>';
             }
-        } else {
-            this.elements.ideContent.innerHTML = `
-                <div style="padding: 20px; color: #dc3545;">
-                    Cannot preview this file.
-                </div>`;
         }
     }
 
-    parseSize(sizeStr) {
-        // e.g. "1.2 MB", "500 KB"
-        if (!sizeStr) return 0;
-        const [num, unit] = sizeStr.split(' ');
-        const n = parseFloat(num);
-        if (unit.startsWith('K')) return n * 1024;
-        if (unit.startsWith('M')) return n * 1024 * 1024;
-        if (unit.startsWith('G')) return n * 1024 * 1024 * 1024;
-        return n;
-    }
-
-    escapeHtml(text) {
-        if (!text) return '';
-        return text.replace(/[&<>"']/g, function (c) {
-            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-        });
-    }
-
-    // Helper method to show success message
-    showSuccess(message) {
-        const notification = document.createElement('div');
-        notification.className = 'notification success';
-        notification.textContent = message;
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
-    }
-
-    // IDE resizing functionality
+    // ---------- IDE Pane Utilities ---------- //
     startResizing(e) {
         this.isResizing = true;
         this.startX = e.clientX;
         this.startWidth = this.elements.idePane.offsetWidth;
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
+        e.preventDefault();
     }
 
     handleResizing(e) {
         if (!this.isResizing) return;
-        
-        const deltaX = this.startX - e.clientX;
-        const newWidth = Math.min(Math.max(this.startWidth + deltaX, 300), 800);
-        this.elements.idePane.style.width = `${newWidth}px`;
+        const dx = this.startX - e.clientX;
+        const newWidth = this.startWidth + dx;
+        const minWidth = 200;
+        const maxWidth = window.innerWidth - 200;
+        this.elements.idePane.style.width = Math.min(maxWidth, Math.max(minWidth, newWidth)) + 'px';
     }
 
     stopResizing() {
         this.isResizing = false;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
     }
 
     closeIdePane() {
         this.elements.idePane.classList.remove('visible');
+        if (this.currentEditor) {
+            this.currentEditor.destroy();
+            this.currentEditor = null;
+        }
         this.openTabs = [];
-        this.elements.ideTabs.innerHTML = '';
+        this.activeTab = null;
+        this.renderIdeTabs();
         this.elements.ideContent.innerHTML = '';
+    }
+
+    // Convert human-readable size (e.g. "1.2 MB") to bytes
+    parseSize(sizeStr) {
+        if (!sizeStr) return 0;
+        const parts = sizeStr.trim().split(/\s+/);
+        const value = parseFloat(parts[0]);
+        if (isNaN(value)) return 0;
+        const unit = (parts[1] || 'B').toUpperCase();
+        const multipliers = { 'B': 1, 'K': 1024, 'KB': 1024, 'M': 1024 ** 2, 'MB': 1024 ** 2, 'G': 1024 ** 3, 'GB': 1024 ** 3 };
+        return value * (multipliers[unit] || 1);
+    }
+
+    // ---------- Dashboard stub ---------- //
+    async loadProjects() {
+        try {
+            const resp = await fetch(`${this.apiBase}/projects`, { credentials: 'include' });
+            if (!resp.ok) throw new Error('Failed to fetch projects');
+            const data = await resp.json();
+            this.renderProjects(data.projects || []);
+        } catch (err) {
+            console.error('Error loading projects:', err);
+            this.renderProjects([]);
+        }
+    }
+
+    renderProjects(projects) {
+        if (!this.elements.projectsContainer) return;
+        if (projects.length === 0) {
+            this.elements.projectsContainer.innerHTML = '<p style="padding:10px;color:#999;">No projects yet.</p>';
+            return;
+        }
+        this.elements.projectsContainer.innerHTML = projects.map(name => `
+            <div class="project-card" data-name="${name}">
+                <i class="fas fa-folder-open"></i>
+                <span>${name}</span>
+            </div>
+        `).join('');
+    }
+
+    async createProject() {
+        const name = (this.elements.newProjectName.value || '').trim();
+        if (!name) return;
+        try {
+            const resp = await fetch(`${this.apiBase}/projects`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ name })
+            });
+            if (!resp.ok) {
+                const d = await resp.json().catch(() => ({}));
+                alert(d.detail || 'Failed to create project');
+                return;
+            }
+            this.elements.newProjectName.value = '';
+            this.loadProjects();
+        } catch (err) {
+            console.error('Create project failed:', err);
+        }
+    }
+
+    openProject(projectName) {
+        this.currentPath = `/${projectName}`;
+        this.elements.projectDashboard.style.display = 'none';
+        this.showMainInterface();
+        // Initialise sandbox workspace for this project
+        this.initSandbox(projectName).catch(err => console.error('Sandbox init failed', err));
+        this.loadCurrentDirectory();
+    }
+
+    async initSandbox(projectName) {
+        try {
+            await fetch(`${this.apiBase}/sandbox/init`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ project: projectName })
+            });
+        } catch (err) {
+            console.error('Sandbox init error', err);
+        }
+    }
+
+    async runSandbox() {
+        const projectName = (this.currentPath.split('/').filter(Boolean)[0]) || '';
+        if (!projectName) {
+            this.showError('No project selected to run.');
+            return;
+        }
+        try {
+            const resp = await fetch(`${this.apiBase}/sandbox/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ project: projectName })
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            window.open('http://localhost:5173', '_blank');
+        } catch (err) {
+            console.error('Sandbox start failed:', err);
+            this.showError('Failed to start sandbox');
+        }
+    }
+
+    showProjectDashboard() {
+        if (!this.elements.projectDashboard) return;
+        this.elements.projectDashboard.style.display = 'block';
+        this.elements.mainContainer.style.display = 'none';
+        this.loadProjects();
+    }
+
+    appendChat(role, content) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-msg ${role}`;
+        msgDiv.textContent = content;
+        this.elements.chatMessages.appendChild(msgDiv);
+        this.elements.chatMessages.scrollTop = this.elements.chatMessages.scrollHeight;
+        this.chatHistory.push({ role, content });
+    }
+
+    async sendChat() {
+        const text = this.elements.chatText.value.trim();
+        if (!text) return;
+        this.elements.chatText.value = '';
+        this.appendChat('user', text);
+        const projectName = (this.currentPath.split('/').filter(Boolean)[0]) || 'scratch';
+        const payload = {
+            project: projectName,
+            model: this.elements.modelSelect.value,
+            messages: this.chatHistory
+        };
+        try {
+            const resp = await fetch(`${this.apiBase}/ai/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            const data = await resp.json();
+            this.appendChat('assistant', data.assistant || '(no response)');
+        } catch (err) {
+            console.error('chat error', err);
+            this.appendChat('assistant', 'Error: ' + err.message);
+        }
     }
 }
 
+// Instantiate the FileManager once the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     new FileManager();
-}); 
+});

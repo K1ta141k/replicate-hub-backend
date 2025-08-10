@@ -11,6 +11,9 @@ body {
     color: #333;
 }
 
+/* Hide login overlay */
+.login-overlay{display:none !important;}
+
 /* Login Screen */
 .login-overlay {
     position: fixed;
@@ -911,11 +914,11 @@ body {
 
 .ide-pane {
     display: none;  /* Initially hidden */
-    width: 40%;
-    min-width: 300px;
+    width: 50%;
+    min-width: 400px;
     max-width: 800px;
-    background: #f8f9fa;
-    border-left: 1px solid #dee2e6;
+    background: #1e1e1e;
+    border-left: 1px solid #333;
     flex-direction: column;
     position: relative;
     overflow: hidden;
@@ -937,31 +940,31 @@ body {
 }
 
 .ide-resizer:hover {
-    background: rgba(102, 126, 234, 0.1);
+    background: rgba(0, 122, 204, 0.3);
 }
 
 .ide-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
-    background: #e9ecef;
-    border-bottom: 1px solid #dee2e6;
+    padding: 10px 15px;
+    background: #2d2d30;
+    border-bottom: 1px solid #3c3c3c;
+    color: #cccccc;
 }
 
 .ide-close-btn {
     background: none;
     border: none;
-    color: #6c757d;
+    color: #cccccc;
     cursor: pointer;
     padding: 5px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
+    border-radius: 3px;
+    transition: background-color 0.2s;
 }
 
 .ide-close-btn:hover {
-    color: #dc3545;
-    background: rgba(220, 53, 69, 0.1);
+    background: #3c3c3c;
 }
 
 .ide-drop-area {
@@ -987,8 +990,8 @@ body {
 
 .ide-tabs {
     display: flex;
-    background: #e9ecef;
-    border-bottom: 1px solid #dee2e6;
+    background: #2d2d30;
+    border-bottom: 1px solid #3c3c3c;
     overflow-x: auto;
     flex-shrink: 0;
 }
@@ -998,18 +1001,19 @@ body {
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: #f8f9fa;
-    border-right: 1px solid #dee2e6;
+    background: #1e1e1e;
+    border-right: 1px solid #3c3c3c;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s;
     min-width: 120px;
     max-width: 200px;
+    color: #cccccc;
 }
 
 .ide-tab.active {
-    background: white;
-    border-bottom: 2px solid #667eea;
+    background: #007acc;
+    color: white;
 }
 
 .ide-tab span {
@@ -1017,26 +1021,369 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 12px;
+    color: inherit;
 }
 
 .close-tab-btn {
     background: none;
     border: none;
-    color: #6c757d;
+    color: #cccccc;
     cursor: pointer;
     padding: 2px 4px;
     border-radius: 2px;
     font-size: 12px;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s;
 }
 
 .close-tab-btn:hover {
-    color: #dc3545;
-    background: rgba(220, 53, 69, 0.1);
+    background: #3c3c3c;
 }
 
 .ide-content {
     flex: 1;
-    overflow: auto;
-    padding: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.monaco-editor-container {
+    width: 100%;
+    height: 100%;
+}
+
+.monaco-editor {
+    width: 100%;
+    height: 100%;
+} 
+
+/* Project Dashboard */
+.project-dashboard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: white;
+    gap: 20px;
+}
+.projects-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+.project-item {
+    padding: 15px 25px;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.project-item:hover {
+    background: #f8f9fa;
+    border-color: #667eea;
+}
+.create-project {
+    display: flex;
+    gap: 10px;
+}
+#create-project-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+} 
+
+/* Retry Save Dialog */
+.retry-save-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 3000;
+}
+
+.retry-save-content {
+    background: #2d2d30;
+    color: #cccccc;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    max-width: 400px;
+    text-align: center;
+}
+
+.retry-save-content h4 {
+    margin-bottom: 15px;
+    color: #ff6b6b;
+    font-size: 18px;
+}
+
+.retry-save-content p {
+    margin-bottom: 20px;
+    color: #cccccc;
+    line-height: 1.5;
+}
+
+.retry-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.retry-btn {
+    background: #007acc;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+    background: #005a9e;
+}
+
+.cancel-retry-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.cancel-retry-btn:hover {
+    background: #5a6268;
+}
+
+/* Recently Saved Tab Indicator */
+.ide-tab.recently-saved {
+    position: relative;
+    animation: savedPulse 0.6s ease-in-out;
+}
+
+.ide-tab.recently-saved::after {
+    content: '✓';
+    position: absolute;
+    top: 2px;
+    right: 25px;
+    color: #28a745;
+    font-weight: bold;
+    font-size: 12px;
+    animation: savedCheck 0.6s ease-in-out;
+}
+
+@keyframes savedPulse {
+    0% { background-color: #1e1e1e; }
+    50% { background-color: #2d2d30; }
+    100% { background-color: #1e1e1e; }
+}
+
+@keyframes savedCheck {
+    0% { opacity: 0; transform: scale(0.5); }
+    50% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* Enhanced Monaco Editor Styling */
+.monaco-editor-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.monaco-editor {
+    width: 100%;
+    height: 100%;
+}
+
+/* Monaco Editor Custom Theme Enhancements */
+.monaco-editor .margin {
+    background-color: #1e1e1e;
+}
+
+.monaco-editor .monaco-editor-background {
+    background-color: #1e1e1e;
+}
+
+.monaco-editor .line-numbers {
+    color: #858585;
+}
+
+.monaco-editor .current-line {
+    background-color: #2d2d30;
+    border: none;
+}
+
+.monaco-editor .selection {
+    background-color: #264f78;
+}
+
+.monaco-editor .inactive-selection {
+    background-color: #3a3d41;
+}
+
+/* IDE Save Button Enhancements */
+#ide-save-btn {
+    background: #007acc;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+}
+
+#ide-save-btn:hover:not(:disabled) {
+    background: #005a9e;
+    transform: translateY(-1px);
+}
+
+#ide-save-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* IDE Content Area Improvements */
+.ide-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: #1e1e1e;
+}
+
+/* Better Tab Styling */
+.ide-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #1e1e1e;
+    border-right: 1px solid #3c3c3c;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    min-width: 120px;
+    max-width: 200px;
+    color: #cccccc;
+    position: relative;
+}
+
+.ide-tab:hover {
+    background: #2d2d30;
+}
+
+.ide-tab.active {
+    background: #007acc;
+    color: white;
+    border-bottom: 2px solid #005a9e;
+}
+
+.ide-tab.active .close-tab-btn {
+    color: white;
+}
+
+.ide-tab.active .close-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* File Type Icons in Tabs */
+.ide-tab::before {
+    content: '';
+    width: 16px;
+    height: 16px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.8;
+}
+
+.ide-tab[data-path*=".js"]::before,
+.ide-tab[data-path*=".jsx"]::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f7df1e"><path d="M0 0h24v24H0V0z"/><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>');
+}
+
+.ide-tab[data-path*=".py"]::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23377ab6"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg>');
+}
+
+.ide-tab[data-path*=".html"]::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23e34f26"><path d="M1.5 0h21l-1.91 21.563L11.64 24l-8.565-2.438L1.5 0zm7.031 9.75l-.232-2.718 10.059.003.23-2.622L5.412 4.41l.698 8.01h5.369l-.326 3.426-2.91.804-2.955-.81-.188-2.11h-1.38l.29 3.855L12 19.351l6.558-1.883L18.5 4.41h-8.469l-.188 2.718z"/></svg>');
+}
+
+.ide-tab[data-path*=".css"]::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%231576b6"><path d="M5 3l-.65 3.34h13.59L17.5 8.5H3.92l-.66 3.33h13.59l-.76 3.81H2.42l-.67 3.34h13.59l-.8 4h-13.6l-.68 3.34h13.59L9 23h13.58l.67-3.34H9.66l.8-4h13.59l.67-3.34H9.67l.76-3.81h13.59L9.6 3.34H9.67L5 3z"/></svg>');
+}
+
+.ide-tab[data-path*=".json"]::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f7df1e"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>');
+}
+
+/* Responsive IDE Pane */
+@media (max-width: 1200px) {
+    .ide-pane {
+        width: 60%;
+        min-width: 350px;
+    }
+}
+
+@media (max-width: 768px) {
+    .ide-pane {
+        width: 100%;
+        min-width: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 1000;
+    }
+    
+    .ide-pane.visible {
+        display: flex;
+    }
+    
+    .ide-close-btn {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        z-index: 1001;
+    }
+} 
+
+/* Modified File Tab Indicator */
+.ide-tab.modified {
+    position: relative;
+    background: #2d2d30;
+    border-left: 3px solid #ffc107;
+}
+
+.ide-tab.modified::after {
+    content: '●';
+    position: absolute;
+    top: 2px;
+    right: 25px;
+    color: #ffc107;
+    font-weight: bold;
+    font-size: 12px;
+    animation: modifiedPulse 2s infinite;
+}
+
+@keyframes modifiedPulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
 } 
