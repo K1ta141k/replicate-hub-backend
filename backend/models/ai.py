@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     messages: List[Dict[str, Any]] = Field(default_factory=list)
     model: str = Field(default="kimi2")
     project: Optional[str] = Field(default=None)
+    session: Optional[str] = Field(default=None, description="Chat history session id")
 
 
 class ChatResponse(BaseModel):

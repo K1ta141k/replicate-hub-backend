@@ -49,6 +49,12 @@ async def sandbox_apply_code(data: dict = Body(...)):
         raise HTTPException(status_code=400, detail="No active sandbox. Create first.")
     response_text = data.get("response")  # noqa: F841 – kept for future use
     files: List[Dict[str, str]] = data.get("files", [])
+    logger.info("apply-code received %s files", len(files))
+    try:
+        import json as _json
+        logger.debug("files payload:\n%s", _json.dumps(files, indent=2)[:2000])
+    except Exception:
+        pass
     files_created, files_updated = 0, 0
     for f in files:
         rel = f.get("path")

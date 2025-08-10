@@ -78,14 +78,29 @@ POST /api/ai/chat
   "messages": [ { "role": "user", "content": "…" }, ... ]
 }
 ```
-• Backend attaches **function schemas** describing available tools so models that support function-calling (OpenAI, Groq) can invoke them.
-• Loop executes up to 5 tool calls automatically and returns final assistant response:
+• Backend attaches function/tool schemas so compatible models can invoke tools.
+• Loop executes up to 5 (quick) or 15 (auto-dev) tool calls and returns final assistant response.
 ```
 {
   "assistant": "Here is your updated App.jsx…",
   "messages": [ full conversation array ]
 }
 ```
+
+#### Models
+GET `/api/ai/models`
+
+Returns the configured model choices the frontend can present:
+```json
+{
+  "models": [
+    { "label": "kimi2", "provider": "groq",   "model_id": "llama3-70b-8192" },
+    { "label": "gpt5",  "provider": "openai", "model_id": "gpt-5" },
+    { "label": "claude","provider": "anthropic", "model_id": "claude-3-opus-20240229" }
+  ]
+}
+```
+Select a model by passing `model` in the chat request body.
 
 ---
 
@@ -143,6 +158,43 @@ sandbox_workspace/    # Deprecated; now identical to workspaces/ but kept for ba
 * More tools: run_tests, git_commit, docker_build, etc.
 * Provider-specific settings (temperature, max_tokens) via request body.
 * E2B remote sandbox integration (if `E2B_API_KEY` set).
+
+---
+
+## 5. Terminal / CLI Endpoint
+
+`POST /api/sandbox/exec`
+
+Executes arbitrary shell command **inside the active sandbox workspace**.
+
+Body
+```json
+{
+  "cmd": "pip install requests",
+  "timeout": 60   // optional, seconds (default 60)
+}
+```
+
+Response
+```json
+{
+  "stdout": "…",
+  "stderr": "…",
+  "code": 0
+}
+```
+
+Rules & behaviour
+* Command runs with working directory = project root (`workspaces/<project>/`).
+* If `venv/` exists its `bin` directory is prepended to `PATH` – so `python`, `pip` etc. use the sandbox’s virtual-env.
+* The endpoint returns only after the process exits or after the timeout.
+* Not exposed to AI tool-calling (only for human users via the terminal pane).
+
+Error responses
+| Code | Reason |
+|------|--------|
+| 400  | Missing `cmd` or sandbox not initialised |
+| 500  | Subprocess error (rare) |
 
 ---
 

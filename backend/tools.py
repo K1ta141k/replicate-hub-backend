@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List
@@ -16,9 +17,25 @@ def _workspace_path(rel: str) -> Path:
     base = sandbox_manager._sandbox_dir() if sandbox_manager.meta else WORKSPACES_ROOT / "_unspecified"
     return base / rel
 
+
+_FENCE_RE = re.compile(r"^```(?:[\w.+-]*)\s*\n([\s\S]*?)\n```\s*$", re.MULTILINE)
+
+
+def _unwrap_markdown_fences(text: str) -> str:
+    """If the entire text is wrapped in a Markdown triple-backtick code fence,
+    return the inner content; otherwise return the original text unchanged.
+    Supports language tags like ```python.
+    """
+    stripped = text.strip()
+    m = _FENCE_RE.match(stripped)
+    if m:
+        return m.group(1)
+    return text
+
 # ------------- tool implementations -------------
 
 def write_file(path: str, content: str) -> Dict[str, Any]:
+    content = _unwrap_markdown_fences(content)
     p = _workspace_path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content)
@@ -28,6 +45,7 @@ def write_file(path: str, content: str) -> Dict[str, Any]:
 
 
 def append_file(path: str, content: str) -> Dict[str, Any]:
+    content = _unwrap_markdown_fences(content)
     p = _workspace_path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as f:
@@ -68,7 +86,13 @@ def list_files(dir: str = "") -> Dict[str, Any]:
     d = _workspace_path(dir)
     if not d.is_dir():
         return {"error": "dir not found"}
-    return {"files": [f.name for f in d.iterdir() if f.is_file()]}
+    return {"files": [f.name for f in d.iterdir() if f.is_file()], "dirs": [f.name for f in d.iterdir() if f.is_dir()]}
+
+
+def make_dir(path: str) -> Dict[str, Any]:
+    p = _workspace_path(path)
+    p.mkdir(parents=True, exist_ok=True)
+    return {"result": "created", "path": path}
 
 
 def start_dev() -> Dict[str, Any]:
@@ -89,6 +113,9 @@ TOOLS_REGISTRY = {
     "delete_file": delete_file,
     "rename_file": rename_file,
     "list_files": list_files,
+    "make_dir": make_dir,
+    "create_dir": make_dir,
+    "mkdir": make_dir,
     "start_dev": start_dev,
     "stop_dev": stop_dev,
 }
@@ -99,7 +126,10 @@ _TOOL_DESCRIPTIONS = {
     "read_file": "Read a text file and return its content.",
     "delete_file": "Delete a file at given path.",
     "rename_file": "Rename a file.",
-    "list_files": "List files in a directory.",
+    "list_files": "List files and directories in a directory.",
+    "make_dir": "Create a directory (and parents) at path.",
+    "create_dir": "Create a directory (and parents) at path.",
+    "mkdir": "Create a directory (and parents) at path.",
     "start_dev": "Start the dev server for current project.",
     "stop_dev": "Stop the dev server.",
 }
@@ -117,12 +147,14 @@ def build_function_schemas() -> List[Dict[str, Any]]:
                 },
                 "required": ["path", "content"],
             }
-        elif name in ["read_file", "delete_file", "start_dev", "stop_dev"]:
-            params = {
-                "type": "object",
-                "properties": {"path": {"type": "string"}},
-                "required": [],
-            }
+        elif name in ["read_file", "delete_file", "start_dev", "stop_dev", "list_files", "make_dir", "create_dir", "mkdir"]:
+            # single optional path or dir param
+            if name == "list_files":
+                params = {"type": "object", "properties": {"dir": {"type": "string"}}, "required": []}
+            elif name in ["make_dir", "create_dir", "mkdir"]:
+                params = {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
+            else:
+                params = {"type": "object", "properties": {"path": {"type": "string"}}, "required": []}
         elif name == "rename_file":
             params = {
                 "type": "object",
@@ -131,12 +163,6 @@ def build_function_schemas() -> List[Dict[str, Any]]:
                     "new_name": {"type": "string"},
                 },
                 "required": ["path", "new_name"],
-            }
-        elif name == "list_files":
-            params = {
-                "type": "object",
-                "properties": {"dir": {"type": "string"}},
-                "required": [],
             }
         else:
             params = {"type": "object", "properties": {}}

@@ -28,6 +28,7 @@ class FileManager {
         this.elements.chatText = document.getElementById('chat-text');
         this.elements.chatSend = document.getElementById('chat-send');
         this.elements.modelSelect = document.getElementById('model-select');
+        this.elements.chatClear = document.getElementById('chat-clear');
         // Terminal elements
         this.elements.terminalPane = document.getElementById('terminal-pane');
         this.elements.terminalToggle = document.getElementById('terminal-toggle-btn');
@@ -787,7 +788,11 @@ class FileManager {
 
         // Chat events
         if (this.elements.chatToggle) {
-            this.elements.chatToggle.addEventListener('click', () => this.elements.chatPane.style.display = 'block');
+            this.elements.chatToggle.addEventListener('click', async () => {
+                this.elements.chatPane.style.display = 'block';
+                await this.refreshChatSessions();
+                await this.loadChatHistory();
+            });
         }
         if (this.elements.chatClose) {
             this.elements.chatClose.addEventListener('click', () => this.elements.chatPane.style.display = 'none');
@@ -801,6 +806,17 @@ class FileManager {
                     e.preventDefault();
                     this.sendChat();
                 }
+            });
+        }
+        if (this.elements.chatClear) {
+            this.elements.chatClear.addEventListener('click', async () => {
+                try {
+                    const u = new URL(`${this.apiBase}/ai/history/clear`);
+                    if (this.chatSession) u.searchParams.set('session', this.chatSession);
+                    await fetch(u.toString(), { method: 'POST', credentials: 'include' });
+                    this.elements.chatMessages.innerHTML = '';
+                    this.chatHistory = [];
+                } catch (err) { console.error('clear history error', err); }
             });
         }
 
@@ -1698,6 +1714,20 @@ class FileManager {
         this.chatHistory.push({ role, content });
     }
 
+    async loadChatHistory() {
+        try {
+            const u = new URL(`${this.apiBase}/ai/history`);
+            if (this.chatSession) u.searchParams.set('session', this.chatSession);
+            const resp = await fetch(u.toString(), { credentials: 'include' });
+            const data = await resp.json();
+            this.elements.chatMessages.innerHTML = '';
+            this.chatHistory = [];
+            (data.messages || []).forEach(m => this.appendChat(m.role, m.content));
+        } catch (err) {
+            console.error('load history error', err);
+        }
+    }
+
     async sendChat() {
         const text = this.elements.chatText.value.trim();
         if (!text) return;
@@ -1707,7 +1737,8 @@ class FileManager {
         const payload = {
             project: projectName,
             model: this.elements.modelSelect.value,
-            messages: this.chatHistory
+            messages: this.chatHistory,
+            session: this.chatSession
         };
         try {
             const resp = await fetch(`${this.apiBase}/ai/chat`, {
@@ -1755,6 +1786,68 @@ class FileManager {
         } catch (err) {
             this.appendTerminal('Error: ' + err.message, 'stderr');
             this.elements.terminalCmd.focus();
+        }
+    }
+
+    ensureChatSessionUI() {
+        // Insert after model-select
+        const header = document.querySelector('#chat-pane .chat-header');
+        if (!header) return;
+        if (!document.getElementById('chat-session-select')) {
+            const sel = document.createElement('select');
+            sel.id = 'chat-session-select';
+            sel.style.marginLeft = '6px';
+            sel.addEventListener('change', async () => {
+                this.chatSession = sel.value || 'history';
+                await this.loadChatHistory();
+            });
+            header.insertBefore(sel, document.getElementById('chat-clear'));
+        }
+        if (!document.getElementById('chat-session-new')) {
+            const input = document.createElement('input');
+            input.id = 'chat-session-new';
+            input.placeholder = 'new-session';
+            input.style.width = '110px';
+            input.style.marginLeft = '6px';
+            const btn = document.createElement('button');
+            btn.id = 'chat-session-create';
+            btn.textContent = 'New';
+            btn.addEventListener('click', async () => {
+                const name = (input.value || '').trim();
+                if (!name) return;
+                await fetch(`${this.apiBase}/ai/history/sessions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ name })
+                });
+                input.value = '';
+                await this.refreshChatSessions(name);
+                await this.loadChatHistory();
+            });
+            header.insertBefore(input, document.getElementById('chat-clear'));
+            header.insertBefore(btn, document.getElementById('chat-clear'));
+        }
+    }
+
+    async refreshChatSessions(selectName) {
+        try {
+            const resp = await fetch(`${this.apiBase}/ai/history/sessions`, { credentials: 'include' });
+            const data = await resp.json();
+            const sel = document.getElementById('chat-session-select');
+            if (!sel) return;
+            sel.innerHTML = '';
+            const sessions = (data.sessions || []);
+            if (!sessions.includes('history')) sessions.unshift('history');
+            sessions.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s; opt.textContent = s;
+                sel.appendChild(opt);
+            });
+            this.chatSession = selectName || this.chatSession || 'history';
+            sel.value = this.chatSession;
+        } catch (err) {
+            console.error('refresh sessions error', err);
         }
     }
 }
