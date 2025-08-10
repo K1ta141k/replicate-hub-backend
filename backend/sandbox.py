@@ -65,6 +65,12 @@ class SandboxManager:
             sandbox_dir.mkdir(parents=True, exist_ok=True)
             self._write_scaffold(sandbox_dir)
 
+        # Ensure Python virtual environment exists for this sandbox
+        venv_dir = sandbox_dir / "venv"
+        if not venv_dir.exists():
+            import sys, subprocess
+            subprocess.run([sys.executable, "-m", "venv", "venv"], cwd=sandbox_dir, check=False)
+
         host = "http://localhost:5173"
         now = datetime.utcnow().isoformat()
         self.meta = {
@@ -141,6 +147,29 @@ class SandboxManager:
         self.cache = files
         self._save_state()
         return files
+
+    # ---------- Command execution ---------- #
+    def run_command(self, cmd: str, timeout: int = 60) -> Dict[str, Any]:
+        """Execute a shell command inside the sandbox directory, using the venv if present."""
+        sandbox_dir = self._sandbox_dir()
+        venv_bin = sandbox_dir / "venv" / "bin"
+        env = os.environ.copy()
+        if venv_bin.exists():
+            # Prepend venv executables to PATH so `python`, `pip`, etc. use the venv
+            env["PATH"] = str(venv_bin) + os.pathsep + env.get("PATH", "")
+        try:
+            proc = subprocess.run(cmd, cwd=sandbox_dir, shell=True, capture_output=True, text=True, timeout=timeout, env=env)
+            return {
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+                "code": proc.returncode,
+            }
+        except subprocess.TimeoutExpired as ex:
+            return {
+                "error": f"Command timed out after {timeout}s",
+                "stdout": ex.stdout,
+                "stderr": ex.stderr,
+            }
 
     # ---------- Internal ---------- #
     def _sandbox_dir(self) -> Path:

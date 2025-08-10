@@ -53,14 +53,21 @@ Place them in `.env`; `python-dotenv` loads them on startup.
 | `POST` | `/api/create-file` | `{ path, content? }` | Create new text file. |
 
 ### 3. Sandbox Service
-All requests include `{ "project": "myProject" }` to identify workspace.
+All requests include `{ "project": "myProject" }` to identify workspace (except `exec`, which runs in the *currently active* sandbox).
 | Method | Path | Body | Result |
 |--------|------|------|--------|
-| `POST` | `/api/sandbox/init` | `{ project, timeoutMs?, apiKey? }` | Ensure workspace exists; scaffold Vite project if empty. _No dev-server yet._ |
-| `POST` | `/api/sandbox/start` | `{ project }` | Runs `npm install` + `npm run dev -- --port 5173` in background. Returns `{ url:"http://localhost:5173" }`. |
-| `POST` | `/api/sandbox/kill`  | – | Terminates dev-server & clears in-memory cache. |
+| `POST` | `/api/sandbox/init` | `{ project, timeoutMs?, apiKey? }` | Ensure workspace exists. Creates React/Vite scaffold **and a Python virtual-env** (`venv/`) if directory is empty. |
+| `POST` | `/api/sandbox/start` | `{ project }` | Runs `npm install && npm run dev -- --port 5173` in background. Returns `{ url:"http://localhost:5173" }`. |
+| `POST` | `/api/sandbox/kill`  | – | Terminates dev-server & clears state. |
+| `POST` | `/api/sandbox/exec` | `{ cmd: "pip list" }` | Execute shell command inside sandbox directory with `venv/bin` prepended to `PATH`. Returns `{ stdout, stderr, code }`. |
 
 Legacy `POST /api/sandbox/create` does **init + start** in one call.
+
+The virtual-env name is always `venv`. A typical prompt in the front-end terminal looks like:
+```
+(venv)user@myProject$ python --version
+Python 3.13.5
+```
 
 ### 4. AI Chat Service
 ```
@@ -95,6 +102,8 @@ start_dev()                    Start dev-server (same as /sandbox/start).
 stop_dev()                     Stop dev-server (same as /sandbox/kill).
 ```
 Schemas are generated dynamically for OpenAI-style function-calling.
+
+Tool registry also includes an implicit `exec` when called via `/sandbox/exec`. This is **not exposed to AI** for safety.
 
 ---
 

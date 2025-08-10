@@ -1,6 +1,7 @@
 class FileManager {
     constructor() {
         this.currentPath = '/';
+        this.currentProject = null;
         this.files = [];
         this.folders = [];
         this.currentView = 'grid';
@@ -27,7 +28,15 @@ class FileManager {
         this.elements.chatText = document.getElementById('chat-text');
         this.elements.chatSend = document.getElementById('chat-send');
         this.elements.modelSelect = document.getElementById('model-select');
+        // Terminal elements
+        this.elements.terminalPane = document.getElementById('terminal-pane');
+        this.elements.terminalToggle = document.getElementById('terminal-toggle-btn');
+        this.elements.terminalClose = document.getElementById('terminal-close');
+        this.elements.terminalOutput = document.getElementById('terminal-output');
+        this.elements.terminalCmd = document.getElementById('terminal-cmd');
+        this.elements.terminalSend = document.getElementById('terminal-send');
         this.chatHistory = [];
+        this.venvName = 'venv';
 
         // Bind events (needs elements ready)
         this.bindEvents();
@@ -791,6 +800,28 @@ class FileManager {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     this.sendChat();
+                }
+            });
+        }
+
+        // Terminal events
+        if (this.elements.terminalToggle) {
+            this.elements.terminalToggle.addEventListener('click', () => {
+                this.elements.terminalPane.style.display = 'block';
+                this.elements.terminalCmd.focus();
+            });
+        }
+        if (this.elements.terminalClose) {
+            this.elements.terminalClose.addEventListener('click', () => this.elements.terminalPane.style.display = 'none');
+        }
+        if (this.elements.terminalSend) {
+            this.elements.terminalSend.addEventListener('click', () => this.sendTerminalCmd());
+        }
+        if (this.elements.terminalCmd) {
+            this.elements.terminalCmd.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.sendTerminalCmd();
                 }
             });
         }
@@ -1608,7 +1639,8 @@ class FileManager {
     }
 
     openProject(projectName) {
-        this.currentPath = `/${projectName}`;
+        this.currentProject = projectName;
+        this.currentPath = '/';
         this.elements.projectDashboard.style.display = 'none';
         this.showMainInterface();
         // Initialise sandbox workspace for this project
@@ -1690,6 +1722,39 @@ class FileManager {
         } catch (err) {
             console.error('chat error', err);
             this.appendChat('assistant', 'Error: ' + err.message);
+        }
+    }
+
+    appendTerminal(text, cls = '') {
+        const span = document.createElement('span');
+        span.textContent = text + '\n';
+        if (cls) span.className = cls;
+        this.elements.terminalOutput.appendChild(span);
+        this.elements.terminalOutput.scrollTop = this.elements.terminalOutput.scrollHeight;
+    }
+
+    async sendTerminalCmd() {
+        const cmd = (this.elements.terminalCmd.value || '').trim();
+        if (!cmd) return;
+        this.elements.terminalCmd.value = '';
+        const prompt = `(${this.venvName})user@${this.currentProject || 'sandbox'}$`;
+        this.appendTerminal(`${prompt} ${cmd}`, 'user-cmd');
+        try {
+            const resp = await fetch(`${this.apiBase}/sandbox/exec`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ cmd })
+            });
+            const data = await resp.json();
+            if (data.stdout) this.appendTerminal(data.stdout, 'stdout');
+            if (data.stderr) this.appendTerminal(data.stderr, 'stderr');
+            if (data.error) this.appendTerminal(data.error, 'stderr');
+            // refocus
+            this.elements.terminalCmd.focus();
+        } catch (err) {
+            this.appendTerminal('Error: ' + err.message, 'stderr');
+            this.elements.terminalCmd.focus();
         }
     }
 }

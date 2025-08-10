@@ -59,6 +59,9 @@
                 <button class="chat-toggle-btn" id="chat-toggle-btn">
                     <i class="fas fa-comments"></i> Chat
                 </button>
+                <button class="terminal-toggle-btn" id="terminal-toggle-btn">
+                    <i class="fas fa-terminal"></i> Terminal
+                </button>
                 <button class="run-sandbox-btn" id="run-sandbox-btn">
                     <i class="fas fa-play"></i> Run Sandbox
                 </button>
@@ -176,6 +179,19 @@
         <div class="chat-input">
             <textarea id="chat-text" rows="2" placeholder="Ask the AI…"></textarea>
             <button id="chat-send">Send</button>
+        </div>
+    </div>
+
+    <!-- Terminal Pane -->
+    <div id="terminal-pane" class="terminal-pane" style="display:none;">
+        <div class="terminal-header">
+            <span>Terminal</span>
+            <button id="terminal-close">×</button>
+        </div>
+        <pre id="terminal-output" class="terminal-output"></pre>
+        <div class="terminal-input">
+            <input type="text" id="terminal-cmd" placeholder="Enter command..." />
+            <button id="terminal-send">Run</button>
         </div>
     </div>
 

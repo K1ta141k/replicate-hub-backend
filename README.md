@@ -6,10 +6,12 @@
 
 ## Features
 
-1. **File-Manager API** – CRUD endpoints for files/folders inside `workspaces/<project>/`.
-2. **Sandbox Manager** – creates one workspace per project and can launch `npm install && npm run dev` on port 5173.
-3. **AI Chat** – `/api/ai/chat` exposes ChatGPT-style interface; the model can call backend tools (`write_file`, `start_dev`, …).
-4. **Minimal Frontend** (Flask + vanilla JS) – demo UI for browsing files, editing with Monaco, running sandbox, and chatting.
+1. **File-Manager API** – secure CRUD over project files/folders (path-sanitised so users can’t escape their sandbox).
+2. **Sandbox Workspace** – each project gets its own directory; on first init we scaffold a minimal React/Vite app **and auto-create a Python virtual-env** (`python -m venv venv`).
+3. **Terminal API** – interactive pane in the UI powered by `POST /api/sandbox/exec`, commands run inside the workspace with the venv on `PATH` (prompt shown as `(venv)user@<project>$`).
+4. **Dev-Server launcher** – one-click `npm install && npm run dev` on port 5173.
+5. **AI Chat** – `/api/ai/chat` endpoint with tool-calling so the model can read/write files or start/stop the dev-server.
+6. **Demo Frontend** (Flask + vanilla JS + Monaco + xterm-like panes).
 
 ---
 
@@ -23,7 +25,7 @@ pip install -r requirements.txt
 cp .env.example .env   # then edit values
 
 # 3. Run backend (FastAPI)
-uvicorn backend.main:app --reload --port 8000
+uvicorn backend.app:app --reload --port 8000  # new entry-point
 
 # 4. Run demo frontend (Flask)
 python frontend/app.py  # serves http://localhost:5000
@@ -40,21 +42,24 @@ E2B_API_KEY=optional
 
 ---
 
-## API Summary
-See `BACKEND_API.md` for the full spec.
+## Core Endpoints (summary)
+See `BACKEND_API.md` for full spec.
 
-* `/api/projects` – create & list projects
-* `/api/list`, `/api/read`, `/api/save`, … – file operations
-* `/api/sandbox/init`, `/start`, `/kill` – sandbox lifecycle
-* `/api/ai/chat` – AI endpoint with function-calling
+| Category | Main endpoints |
+|----------|----------------|
+| Projects | `POST /api/projects`, `GET /api/projects` |
+| Files    | `GET /api/list`, `GET /api/read`, `POST /api/save`, `upload`, `rename`, `delete`, `create-file` |
+| Sandbox  | `sandbox/init`, `start`, `kill`, **`exec`** (terminal) |
+| AI Chat  | `POST /api/ai/chat` |
+| Auth     | `login`, `logout`, `check-auth` (PIN – can be disabled) |
 
 ---
 
 ## Folder Layout
 ```
 backend/           FastAPI app
-frontend/          Flask demo UI
-workspaces/        <created at runtime>
+frontend/          Flask demo UI (file-manager + IDE + chat + terminal)
+workspaces/        All sandbox workspaces live here (one per project)
 BACKEND_API.md     Complete REST + tool documentation
 scripts/           Helper CLI scripts (e.g. start_sandbox.py)
 ```

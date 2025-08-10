@@ -1387,3 +1387,172 @@ body {
     50% { opacity: 0.5; }
     100% { opacity: 1; }
 } 
+
+/* ---- AI Chat Pane ---- */
+.chat-pane {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 320px;
+    max-height: 70vh;
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 2500;
+    overflow: hidden;
+}
+.chat-pane .chat-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.chat-pane .chat-header select {
+    flex: 1;
+    background: rgba(255,255,255,0.2);
+    border: none;
+    padding: 4px 8px;
+    color: #fff;
+    border-radius: 4px;
+    font-size: 12px;
+}
+.chat-pane .chat-header button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+}
+.chat-pane .chat-messages {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+    background: #fafafa;
+}
+.chat-pane .chat-msg {
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.chat-pane .chat-msg.user {
+    background: #e9ecef;
+    align-self: flex-end;
+}
+.chat-pane .chat-msg.assistant {
+    background: #f1f1ff;
+    border-left: 3px solid #667eea;
+}
+.chat-pane .chat-input {
+    display: flex;
+    gap: 6px;
+    padding: 10px;
+    border-top: 1px solid #e9ecef;
+    background: #fff;
+}
+.chat-pane .chat-input textarea {
+    flex: 1;
+    resize: none;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+    height: 40px;
+}
+.chat-pane .chat-input button {
+    background: #667eea;
+    border: none;
+    color: #fff;
+    padding: 0 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.chat-pane .chat-input button:hover {
+    background: #5869d6;
+}
+
+@media (max-width: 480px) {
+  .chat-pane {
+    width: 90vw;
+    right: 5vw;
+    bottom: 5vh;
+  }
+} 
+
+/* ---- Terminal Pane ---- */
+.terminal-pane {
+    position: fixed;
+    bottom: 90px;
+    right: 360px; /* leave room for chat */
+    width: 420px;
+    max-height: 70vh;
+    background: #000;
+    color: #ececec;
+    border: 1px solid #444;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    z-index: 2500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+.terminal-header {
+    background: #222;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+.terminal-header button {
+    background: none;
+    border: none;
+    color: #ececec;
+    font-size: 18px;
+    cursor: pointer;
+}
+.terminal-output {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+}
+.terminal-input {
+    display: flex;
+    border-top: 1px solid #444;
+    padding: 6px;
+    gap: 6px;
+    background: #111;
+}
+.terminal-input input {
+    flex: 1;
+    background: #000;
+    border: 1px solid #444;
+    color: #ececec;
+    padding: 4px 6px;
+    font-family: monospace;
+    font-size: 12px;
+}
+.terminal-input button {
+    background: #444;
+    color: #fff;
+    border: none;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+.terminal-input button:hover {
+    background: #666;
+}
+
+.terminal-output .stderr { color: #ff6b6b; }
+.terminal-output .stdout { color: #d4d4d4; }
+.user-cmd { color: #4ec9b0; } 
