@@ -1,4 +1,4 @@
-# Shellles Backend ‑ API & Services Documentation
+# Replicate Hub Backend ‑ API & Services Documentation
 
 _Last updated: 2025-08-10_
 
@@ -23,9 +23,12 @@ No duplicate copies are kept; the dev-server, AI tools, and manual edits all ope
 | Key | Purpose |
 |-----|---------|
 | `SECRET_KEY` | FastAPI session middleware secret (any random string) |
-| `OPENAI_API_KEY` | API key for OpenAI (GPT-5 etc.) |
-| `GROQ_API_KEY` | API key for Groq (Kimi-2 / Llama-3) |
-| `ANTHROPIC_API_KEY` | API key for Anthropic (Claude-3) |
+| `OPENAI_API_KEY` | API key for OpenAI |
+| `GROQ_API_KEY` | API key for Groq |
+| `ANTHROPIC_API_KEY` | API key for Anthropic |
+| `SANDBOX_HOST` | Host interface for dev server bind (default `0.0.0.0`) |
+| `SANDBOX_PORT` | Dev server port (default `5173`) |
+| `SANDBOX_PUBLIC_HOST` | Hostname/IP used in returned URL (default `localhost`) |
 | `E2B_API_KEY` | Optional: key for E2B cloud sandboxes (future) |
 
 Place them in `.env`; `python-dotenv` loads them on startup.
@@ -57,7 +60,7 @@ All requests include `{ "project": "myProject" }` to identify workspace (except 
 | Method | Path | Body | Result |
 |--------|------|------|--------|
 | `POST` | `/api/sandbox/init` | `{ project, timeoutMs?, apiKey? }` | Ensure workspace exists. Creates React/Vite scaffold **and a Python virtual-env** (`venv/`) if directory is empty. |
-| `POST` | `/api/sandbox/start` | `{ project }` | Runs `npm install && npm run dev -- --port 5173` in background. Returns `{ url:"http://localhost:5173" }`. |
+| `POST` | `/api/sandbox/start` | `{ project }` | Runs `npm install && npm run dev -- --host $SANDBOX_HOST --port $SANDBOX_PORT` in background. Returns `{ url:"http://$SANDBOX_PUBLIC_HOST:$SANDBOX_PORT" }`. |
 | `POST` | `/api/sandbox/kill`  | – | Terminates dev-server & clears state. |
 | `POST` | `/api/sandbox/exec` | `{ cmd: "pip list" }` | Execute shell command inside sandbox directory with `venv/bin` prepended to `PATH`. Returns `{ stdout, stderr, code }`. |
 
@@ -74,15 +77,16 @@ Python 3.13.5
 POST /api/ai/chat
 {
   "project": "myProject",
-  "model": "kimi2" | "gpt5" | "claude",
-  "messages": [ { "role": "user", "content": "…" }, ... ]
+  "model": "kimi2" | "gpt5" | "gpt4o" | "gpt4o-mini" | "gpt41-mini" | "claude",
+  "messages": [ { "role": "user", "content": "…" }, ... ],
+  "session": "history-optional"
 }
 ```
 • Backend attaches function/tool schemas so compatible models can invoke tools.
-• Loop executes up to 5 (quick) or 15 (auto-dev) tool calls and returns final assistant response.
+• For complex prompts the agent batches tool_calls (e.g. write multiple files) to reduce network round trips.
 ```
 {
-  "assistant": "Here is your updated App.jsx…",
+  "assistant": "App is running at http://example.com:5173.",
   "messages": [ full conversation array ]
 }
 ```
@@ -95,7 +99,10 @@ Returns the configured model choices the frontend can present:
 {
   "models": [
     { "label": "kimi2", "provider": "groq",   "model_id": "llama3-70b-8192" },
-    { "label": "gpt5",  "provider": "openai", "model_id": "gpt-5" },
+    { "label": "gpt5",  "provider": "openai", "model_id": "gpt-5-2025-08-07" },
+    { "label": "gpt4o",  "provider": "openai", "model_id": "gpt-4o" },
+    { "label": "gpt4o-mini",  "provider": "openai", "model_id": "gpt-4o-mini" },
+    { "label": "gpt41-mini",  "provider": "openai", "model_id": "gpt-4.1-mini" },
     { "label": "claude","provider": "anthropic", "model_id": "claude-3-opus-20240229" }
   ]
 }
@@ -113,10 +120,11 @@ read_file(path)                Return file content.
 delete_file(path)              Delete a file.
 rename_file(path, new_name)    Rename a file.
 list_files(dir="")             List filenames in directory.
+make_dir(path)                 Create a directory (aliases: create_dir, mkdir).
 start_dev()                    Start dev-server (same as /sandbox/start).
 stop_dev()                     Stop dev-server (same as /sandbox/kill).
 ```
-Schemas are generated dynamically for OpenAI-style function-calling.
+Schemas are generated dynamically for OpenAI-style tool-calling.
 
 Tool registry also includes an implicit `exec` when called via `/sandbox/exec`. This is **not exposed to AI** for safety.
 
@@ -130,7 +138,7 @@ workspaces/           # All projects live here
         index.html
         src/
 
-sandbox_workspace/    # Deprecated; now identical to workspaces/ but kept for backward-compat
+sandbox_workspace/    # Internal location for live sandboxes
 ```
 
 ---
@@ -138,16 +146,16 @@ sandbox_workspace/    # Deprecated; now identical to workspaces/ but kept for ba
 ## Typical Flow
 1. **Create Project** – `POST /api/projects { name }` → workspace folder.
 2. **Edit Files** – File-manager endpoints operate directly in workspace.
-3. **Start App** – `POST /api/sandbox/start { project }` → opens http://localhost:5173.
-4. **AI Assistance** – front-end sends chat to `/api/ai/chat`; AI can call tools to refactor code automatically.
-5. **Stop App** – `POST /api/sandbox/kill` when done (optional – autoreload dev-server dies on backend restart).
+3. **Start App** – `POST /api/sandbox/start { project }` → opens http://$SANDBOX_PUBLIC_HOST:$SANDBOX_PORT.
+4. **AI Assistance** – front-end sends chat to `/api/ai/chat`; AI can batch tool_calls to scaffold files.
+5. **Stop App** – `POST /api/sandbox/kill` when done.
 
 ---
 
 ## Error Codes
 | Code | Reason |
 |------|--------|
-| 400  | Bad request / missing param / sandbox not initialised |
+| 400  | Bad request / missing param / sandbox not initialised / provider error |
 | 404  | File or project not found |
 | 500  | Unhandled server exception |
 
@@ -171,7 +179,7 @@ Body
 ```json
 {
   "cmd": "pip install requests",
-  "timeout": 60   // optional, seconds (default 60)
+  "timeout": 60
 }
 ```
 
@@ -198,4 +206,4 @@ Error responses
 
 ---
 
-> Maintainer: Shellles Backend Team
+> Maintainer: Replicate Hub Team
